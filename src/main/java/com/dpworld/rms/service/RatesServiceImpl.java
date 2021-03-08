@@ -5,22 +5,26 @@ import com.dpworld.rms.exception.InternalServerException;
 import com.dpworld.rms.exception.ResourceNotFoundException;
 import com.dpworld.rms.model.Rate;
 import com.dpworld.rms.repository.RatesRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.PropertySource;
-import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
 @Service
 @PropertySource("classpath:rmserrors.properties")
 public class RatesServiceImpl implements RatesService {
     private final RatesRepository ratesRepository;
-    private final Environment environment;
     private final SurchargeServiceImpl surchargeServiceImpl;
     private final RateAndSurcharge rateAndSurcharge;
-
-    public RatesServiceImpl(RatesRepository ratesRepository, Environment environment,
+    @Value("${not.found}")
+    private String notFound;
+    @Value("${internal.error}")
+    private String internalError;
+    private static final Logger logger = LoggerFactory.getLogger(RatesServiceImpl.class);
+    public RatesServiceImpl(RatesRepository ratesRepository,
                             SurchargeServiceImpl surchargeServiceImpl, RateAndSurcharge rateAndSurcharge) {
         this.ratesRepository = ratesRepository;
-        this.environment = environment;
         this.surchargeServiceImpl = surchargeServiceImpl;
         this.rateAndSurcharge = rateAndSurcharge;
     }
@@ -29,7 +33,7 @@ public class RatesServiceImpl implements RatesService {
         rateAndSurcharge.setRate(ratesRepository.findByRateId(rateId));
         rateAndSurcharge.setSurcharge(surchargeServiceImpl.getSurcharge());
         if (!rateAndSurcharge.getRate().isPresent()) {
-            throw new ResourceNotFoundException(environment.getProperty("not.found"));
+            throw new ResourceNotFoundException(notFound);
         }
         return rateAndSurcharge;
     }
@@ -38,7 +42,8 @@ public class RatesServiceImpl implements RatesService {
         try {
             return ratesRepository.findAll();
         } catch (RuntimeException exception) {
-            throw new InternalServerException(environment.getProperty("internal.error"));
+            logger.error(exception.getMessage());
+            throw new InternalServerException(internalError);
         }
     }
     @Override
@@ -46,7 +51,8 @@ public class RatesServiceImpl implements RatesService {
         try {
             return ratesRepository.save(rate);
         } catch (RuntimeException exception) {
-            throw new InternalServerException(environment.getProperty("internal.error"));
+            logger.error(exception.getMessage());
+            throw new InternalServerException(internalError);
         }
     }
     @Override
@@ -61,10 +67,11 @@ public class RatesServiceImpl implements RatesService {
                 rate.setRateId(id);
                 return ratesRepository.save(rate);
             }).orElseGet(() -> {
-                throw new ResourceNotFoundException(environment.getProperty("not.found"));
+                throw new ResourceNotFoundException(notFound);
             });
         } catch (InternalServerException exception) {
-            throw new InternalServerException(environment.getProperty("internal.error"));
+            logger.error(exception.getMessage());
+            throw new InternalServerException(internalError);
         }
     }
 
@@ -73,7 +80,8 @@ public class RatesServiceImpl implements RatesService {
         try {
             ratesRepository.deleteById(rateId);
         } catch (RuntimeException exception) {
-            throw new ResourceNotFoundException(environment.getProperty("not.found"));
+            logger.error(exception.getMessage());
+            throw new ResourceNotFoundException(notFound);
         }
     }
 }
